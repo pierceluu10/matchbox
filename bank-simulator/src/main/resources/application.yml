@@ -1,0 +1,30 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: bank-simulator
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+matchbox:
+  bank:
+    decline-rate: 0.02
+    transient-failure-rate: 0.02
+    amount-mismatch-rate: 0.01
+    missing-settlement-rate: 0.005
+    duplicate-settlement-rate: 0.01
+    settlement-delay: ${SETTLEMENT_DELAY:3s}
+    max-delivery-attempts: 5
+    settlement-webhook-url: ${SETTLEMENT_WEBHOOK_URL:http://localhost:8082/settlements}
+    webhook-secret: ${WEBHOOK_SECRET:local-dev-webhook-secret}
