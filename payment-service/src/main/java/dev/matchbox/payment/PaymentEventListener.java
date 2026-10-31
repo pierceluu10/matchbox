@@ -1,5 +1,6 @@
 package dev.matchbox.payment;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
 import dev.matchbox.shared.events.ExceptionUpdated;
@@ -7,7 +8,9 @@ import dev.matchbox.shared.events.PaymentRequested;
 import dev.matchbox.shared.events.Topics;
 import dev.matchbox.shared.kafka.NonRetryableEventException;
 
+import org.springframework.kafka.annotation.BackOff;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.annotation.RetryableTopic;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -29,7 +32,14 @@ class PaymentEventListener {
 		this.jsonMapper = jsonMapper;
 	}
 
-	/** Replays of an already-processed payment are skipped before the bank is called. */
+	/**
+	 * Replays of an already-processed payment are skipped before the bank is called. A failed bank
+	 * call moves the event to a retry topic instead of retrying in place, so one flaky charge
+	 * doesn't hold up every payment behind it on the partition.
+	 */
+	@RetryableTopic(attempts = "5", backOff = @BackOff(delay = 200, multiplier = 2, maxDelay = 2_000),
+			numPartitions = "" + Topics.PARTITIONS, dltTopicSuffix = Topics.DEAD_LETTER_SUFFIX,
+			exclude = { JacksonException.class, NonRetryableEventException.class }, traversingCauses = "true")
 	@KafkaListener(topics = Topics.PAYMENT_REQUESTED)
 	void onPaymentRequested(String payload) {
 		PaymentRequested event = this.jsonMapper.readValue(payload, PaymentRequested.class);

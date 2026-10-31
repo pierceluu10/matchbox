@@ -37,7 +37,6 @@ class PaymentService {
 		this.processingTimer = Timer.builder("matchbox.payment.processing")
 			.description("Time from payment accepted to charge outcome recorded")
 			.publishPercentiles(P95)
-			.publishPercentileHistogram()
 			.register(meterRegistry);
 	}
 
