@@ -13,15 +13,11 @@ import dev.matchbox.shared.events.PaymentRequested;
 import dev.matchbox.shared.events.Topics;
 import dev.matchbox.shared.outbox.OutboxWriter;
 
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 class PaymentService {
-
-	static final String CACHE = "payments";
 
 	private static final double P95 = 0.95;
 
@@ -64,13 +60,11 @@ class PaymentService {
 		return payment;
 	}
 
-	@Cacheable(cacheNames = CACHE, unless = "#result == null")
 	public Payment find(UUID paymentId) {
 		return this.repository.findById(paymentId).orElse(null);
 	}
 
 	@Transactional
-	@CacheEvict(cacheNames = CACHE, key = "#paymentId")
 	public void recordCharge(UUID paymentId, PaymentStatus status) {
 		this.repository.markProcessed(paymentId, status).ifPresent((payment) -> {
 			ChargeOutcome outcome = (status == PaymentStatus.CHARGED) ? ChargeOutcome.CHARGED : ChargeOutcome.FAILED;
@@ -81,7 +75,6 @@ class PaymentService {
 	}
 
 	@Transactional
-	@CacheEvict(cacheNames = CACHE, key = "#event.paymentId()")
 	public void applyExceptionUpdate(ExceptionUpdated event) {
 		this.repository.updateExceptionStatus(event.paymentId(), event.status());
 	}

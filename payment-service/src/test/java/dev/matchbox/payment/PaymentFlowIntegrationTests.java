@@ -10,7 +10,6 @@ import java.util.UUID;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.GenericContainer;
 import tools.jackson.databind.json.JsonMapper;
 
 import dev.matchbox.shared.KafkaPostgresContainers;
@@ -25,10 +24,7 @@ import dev.matchbox.shared.events.Topics;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -51,13 +47,10 @@ import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
 		properties = "matchbox.outbox.poll-interval-ms=10")
-@Import({ KafkaPostgresContainers.class, PaymentFlowIntegrationTests.RedisContainer.class })
+@Import(KafkaPostgresContainers.class)
 class PaymentFlowIntegrationTests {
 
 	private static final Duration WAIT = Duration.ofSeconds(20);
-
-	/** Shorter than the 5s cache TTL, so passing proves the write evicted the cached status. */
-	private static final Duration EVICTION_WAIT = Duration.ofSeconds(3);
 
 	private static final Duration REPLAY_SETTLE = Duration.ofSeconds(2);
 
@@ -192,7 +185,7 @@ class PaymentFlowIntegrationTests {
 	}
 
 	@Test
-	void exceptionUpdatesReachThePaymentAndEvictTheCachedStatus() {
+	void exceptionUpdatesReachThePayment() {
 		UUID paymentId = post(validPayment(), null).getBody().paymentId();
 		awaitStatus(paymentId, PaymentStatus.CHARGED);
 		assertThat(get(paymentId).exceptionStatus()).isNull();
@@ -201,7 +194,7 @@ class PaymentFlowIntegrationTests {
 				this.jsonMapper.writeValueAsString(new ExceptionUpdated(paymentId, UUID.randomUUID(),
 						ExceptionType.AMOUNT_MISMATCH, ExceptionStatus.OPEN, Instant.now())));
 
-		await().atMost(EVICTION_WAIT)
+		await().atMost(WAIT)
 			.untilAsserted(() -> assertThat(get(paymentId).exceptionStatus()).isEqualTo(ExceptionStatus.OPEN));
 	}
 
@@ -241,21 +234,6 @@ class PaymentFlowIntegrationTests {
 
 	private long countProcessedEvents(UUID paymentId) {
 		return TopicReader.awaitRecords(this.consumerFactory, Topics.PAYMENT_PROCESSED, paymentId.toString()).size();
-	}
-
-	@TestConfiguration(proxyBeanMethods = false)
-	static class RedisContainer {
-
-		private static final String REDIS_IMAGE = "redis:7.4-alpine";
-
-		private static final int REDIS_PORT = 6379;
-
-		@Bean
-		@ServiceConnection(name = "redis")
-		GenericContainer<?> redisContainer() {
-			return new GenericContainer<>(REDIS_IMAGE).withExposedPorts(REDIS_PORT);
-		}
-
 	}
 
 }
