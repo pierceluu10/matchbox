@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Matchbox exceptions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <div>
+      <p class="product">Matchbox</p>
+      <h1>Reconciliation exceptions</h1>
+    </div>
+    <p class="freshness" id="freshness" aria-live="polite"></p>
+  </header>
+
+  <main>
+    <section class="overview" aria-label="Summary">
+      <p class="summary" id="summary">Loading exceptions…</p>
+      <div class="status-filter" role="radiogroup" aria-label="Show">
+        <button type="button" role="radio" data-status="OPEN" aria-checked="true">Open</button>
+        <button type="button" role="radio" data-status="RESOLVED" aria-checked="false">Resolved</button>
+        <button type="button" role="radio" data-status="" aria-checked="false">All</button>
+      </div>
+    </section>
+
+    <p class="notice" id="notice" role="alert" hidden></p>
+
+    <table class="ledger">
+      <thead>
+        <tr>
+          <th scope="col">Detected</th>
+          <th scope="col">Payment</th>
+          <th scope="col">Problem</th>
+          <th scope="col" class="money">We charged</th>
+          <th scope="col" class="money">Bank settled</th>
+          <th scope="col" class="money">Difference</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="empty" id="empty" hidden></p>
+  </main>
+
+  <dialog class="drawer" id="drawer" aria-labelledby="drawer-title">
+    <form method="dialog" class="drawer-close">
+      <button type="submit" aria-label="Close">Close</button>
+    </form>
+    <h2 id="drawer-title"></h2>
+    <dl class="facts" id="drawer-facts"></dl>
+    <section class="playbook">
+      <h3>What to do</h3>
+      <p id="drawer-action"></p>
+    </section>
+    <form class="resolve" id="resolve-form">
+      <label for="resolve-note">How was it resolved?</label>
+      <textarea id="resolve-note" name="note" rows="4" maxlength="500" required
+        placeholder="e.g. Bank confirmed a fee was deducted; refund issued"></textarea>
+      <p class="field-error" id="resolve-error" role="alert" hidden></p>
+      <button type="submit" class="primary">Resolve exception</button>
+    </form>
+    <p class="resolution" id="drawer-resolution" hidden></p>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

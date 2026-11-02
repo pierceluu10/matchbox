@@ -1,0 +1,117 @@
+name: matchbox
+
+x-service: &service
+  build:
+    context: .
+  restart: unless-stopped
+  mem_limit: 768m
+  depends_on:
+    kafka:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+  environment: &service-environment
+    KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    POSTGRES_HOST: postgres
+    WEBHOOK_SECRET: ${WEBHOOK_SECRET:-local-dev-webhook-secret}
+
+services:
+  kafka:
+    image: apache/kafka:4.1.0
+    ports:
+      - "9092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # PLAINTEXT for containers on the compose network, HOST for apps run from an IDE.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Services declare their topics with the right partition count; never auto-create a 1-partition topic.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: matchbox
+      POSTGRES_PASSWORD: matchbox
+    volumes:
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "matchbox"]
+      interval: 2s
+      retries: 30
+
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  payment-service:
+    <<: *service
+    build:
+      context: .
+      args:
+        MODULE: payment-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *service-environment
+      REDIS_HOST: redis
+      BANK_URL: http://bank-simulator:8081
+
+  bank-simulator:
+    <<: *service
+    build:
+      context: .
+      args:
+        MODULE: bank-simulator
+    ports:
+      - "8081:8081"
+    depends_on: {}
+    environment:
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-local-dev-webhook-secret}
+      SETTLEMENT_WEBHOOK_URL: http://reconciliation-service:8082/settlements
+
+  reconciliation-service:
+    <<: *service
+    build:
+      context: .
+      args:
+        MODULE: reconciliation-service
+    ports:
+      - "8082:8082"
+
+  exception-service:
+    <<: *service
+    build:
+      context: .
+      args:
+        MODULE: exception-service
+    ports:
+      - "8083:8083"
