@@ -18,14 +18,6 @@ spring:
       auto-offset-reset: earliest
     listener:
       concurrency: 6
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-  cache:
-    type: redis
-    redis:
-      # Backstop for the rare stale write-back after eviction; eviction on write is the main mechanism.
-      time-to-live: 5s
   mvc:
     problemdetails:
       enabled: true

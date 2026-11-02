@@ -4,14 +4,14 @@ Event-driven payment reconciliation: Kafka-connected Spring Boot microservices t
 charge a (simulated) bank, match every charge against the bank's settlement, and track mismatches
 through to resolution.
 
-Java 21 · Spring Boot 4.1 · Kafka 4.1 (KRaft) · PostgreSQL 17 · Redis 7 · Docker Compose
+Java 21 · Spring Boot 4.1 · Kafka 4.1 (KRaft) · PostgreSQL 17 · Docker Compose
 
 ## Architecture
 
 ```
 client ──POST /payments──▶ payment-service ──HTTP charge (paymentId)──▶ bank-simulator
    ◀──202 + paymentId──────┤   owns payments DB,                          │ settles later; sometimes
-client ──GET /payments/{id}▶   Redis status cache                         │ wrong amount, missing,
+client ──GET /payments/{id}▶                                              │ wrong amount, missing,
                            │                                              │ or sent twice
         payment-requested ─┘ (consumed by itself)                         │
         payment-processed ─────────▶ reconciliation-service ◀──POST /settlements (HMAC-signed)
@@ -47,8 +47,6 @@ for one payment land on one partition, in order, handled by one consumer at a ti
 - **Webhook trust boundary.** Settlements must carry an HMAC-SHA256 signature over the raw body,
   compared in constant time; unsigned or malformed requests get 401/400. A 200 means the
   settlement is durable.
-- **Cache correctness.** Status reads are cache-aside in Redis; writes evict after commit
-  (transaction-aware cache), with a 5 s TTL as a backstop.
 
 ## Run it
 
@@ -67,7 +65,7 @@ curl -i -X POST localhost:8080/payments -H 'Content-Type: application/json' \
 
 ## Results
 
-Measured on one laptop (Docker Desktop, 10 CPUs, 8 GB), all services, Kafka, Postgres and Redis on
+Measured on one laptop (Docker Desktop, 10 CPUs, 8 GB), all services, Kafka and Postgres on
 the same machine. Reproduce with the scripts below.
 
 **Load test** (`RATE=200 DURATION=2m scripts/load-test.sh`): 200 payments/s = **12,000/min**, each
@@ -93,9 +91,9 @@ cases, bank charge counts and every topic's end offset were **identical before a
 ./mvnw verify
 ```
 
-Integration tests run against real Kafka and Postgres (and Redis) via Testcontainers. They cover
+Integration tests run against real Kafka and Postgres via Testcontainers. They cover
 the async API contract, idempotency keys, replayed events, retries, DLQ routing, out-of-order
-sides, missing/unexpected settlements, webhook signatures and cache eviction.
+sides, missing/unexpected settlements and webhook signatures.
 
 ## Known limits
 
